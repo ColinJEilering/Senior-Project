@@ -3,13 +3,12 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
+from django.core.paginator import Paginator
 from django.contrib.auth import authenticate, login, logout
 import environ
 import os
 import requests
 import logging
-import sqlite3
-from django.contrib.auth.forms import UserCreationForm
 from myspotifyproject.settings import BASE_DIR
 from .models import Song
 from django.db.models import Avg
@@ -17,10 +16,9 @@ import time
 from django.conf import settings
 
 
-#This started as me wanting to create recommendation playlists, but as I started to dive into this, I decided
-#that I should start to flesh it out into a website/app that others can use. This has been a learning experience
-#more than anything. I have taught myself html, css, and some javascript during this process. I also had to learn
-#how to code with spotify API which is a challenge in itself. 
+#So I found out that Spotify depreciated a lot of their endpoints, so we will have to figure out new ways
+#To recommend songs. They removed all of the audio features and recommendation endpoints, so we are
+#starting from scratch here.
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +51,20 @@ def spotify_callback(request):
 
     code = request.GET.get('code')
     if not code:
-        print("❌ No authorization code found in request.")
+        print("No authorization code found in request.")
         return redirect('login')
 
     token_info = sp_oauth.get_access_token(code)
 
-    print("🔍 DEBUG: token_info received from Spotify:", token_info)
+    print("DEBUG: token_info received from Spotify:", token_info)
 
     if token_info and 'access_token' in token_info:
         # Force session to be stored explicitly
         request.session['token_info'] = token_info
         request.session.save()  # 👈 Explicitly save session
-        print("✅ token_info successfully stored in session:", request.session['token_info'])
+        print("token_info successfully stored in session:", request.session['token_info'])
     else:
-        print("❌ Failed to retrieve token_info from Spotify.")
+        print("Failed to retrieve token_info from Spotify.")
 
     return redirect('view_top_artists')
 
@@ -80,14 +78,14 @@ def spotify_login(request):
     return redirect(auth_url)
 
 def get_spotify_client(request):
-    logger.info("📢 Checking for Spotify client in session...")
+    logger.info("Checking for Spotify client in session...")
 
     # Debug: Log session contents
-    logger.info(f"📦 Current session contents: {dict(request.session.items())}")
+    logger.info(f"Current session contents: {dict(request.session.items())}")
 
     token_info = request.session.get('token_info', None)
     if not token_info:
-        logger.warning("❌ No token info found in session.")
+        logger.warning("No token info found in session.")
         return None
 
     # Refresh the token if it's expired
@@ -97,32 +95,32 @@ def get_spotify_client(request):
                 client_secret=env('SPOTIPY_CLIENT_SECRET'),
                 redirect_uri='http://localhost:8888/callback'))
         try:
-            logger.info("🔄 Refreshing expired token...")
+            logger.info("Refreshing expired token...")
             token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
             request.session['token_info'] = token_info
             request.session.modified = True
-            logger.info("✅ Token refreshed successfully!")
+            logger.info("Token refreshed successfully!")
         except SpotifyOauthError as e:
-            logger.error(f"❌ Error refreshing token: {e}")
+            logger.error(f"Error refreshing token: {e}")
             return redirect('spotify_login')
 
-    logger.info(f"✅ Using access token: {token_info['access_token']}")
+    logger.info(f"Using access token: {token_info['access_token']}")
     return spotipy.Spotify(auth=token_info['access_token'])
 
 def test_spotify_connection(request):
-    logger.info("📢 Testing Spotify connection...")
+    logger.info("Testing Spotify connection...")
 
     sp = get_spotify_client(request)
     if sp is None:
-        logger.warning("❌ No Spotify client found, redirecting to login.")
+        logger.warning("No Spotify client found, redirecting to login.")
         return redirect('spotify_login')  
 
     try:
         user_profile = sp.current_user()
-        logger.info(f"✅ Successfully retrieved user profile: {user_profile}")
+        logger.info(f"Successfully retrieved user profile: {user_profile}")
         return JsonResponse(user_profile)
     except spotipy.exceptions.SpotifyException as e:
-        logger.error(f"❌ Error connecting to Spotify API: {e}")
+        logger.error(f"Error connecting to Spotify API: {e}")
         return HttpResponse(f"Error connecting to Spotify API: {e}", status=500)
 
 def login_view(request):
@@ -181,37 +179,32 @@ def get_or_create_song(track, user):
         song, created = Song.objects.get_or_create(track_id=track_id)
 
         if created:
-            # Populate song fields with API data
+            # Populate song fields with available track data
             song.track_name = track.get('name', 'Unknown')
             song.artist_names = ', '.join([artist.get('name', 'Unknown') for artist in track.get('artists', [])])
             song.album_art = track.get('album', {}).get('images', [{}])[0].get('url', '')
-
-            # Fetch and save the song's audio features
-            features = sp.audio_features(track_id)[0]
-            if features:
-                song.danceability = features.get('danceability')
-                song.energy = features.get('energy')
-                song.valence = features.get('valence')
-                song.popularity = track.get('popularity')
-                song.acousticness = features.get('acousticness')
-                song.instrumentalness = features.get('instrumentalness')
-                song.liveness = features.get('liveness')
-                song.speechiness = features.get('speechiness')
-            else:
-                logger.warning(f"Audio features for track {track_id} are not available.")
-
+            song.popularity = track.get('popularity')
+            song.release_date = track.get('album', {}).get('release_date', 'Unknown')
+            
+            logger.info(f"Audio features are deprecated, storing only available metadata for {track_id}.")
+            
             # Fetch and save genres
             genres = []
             for artist in track.get('artists', []):
-                artist_info = sp.artist(artist.get('id', ''))
-                genres.extend(artist_info.get('genres', []))
+                artist_id = artist.get('id')
+                if artist_id:
+                    try:
+                        artist_info = sp.artist(artist_id)
+                        genres.extend(artist_info.get('genres', []))
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch genres for artist {artist_id}: {e}")
             song.genres = ', '.join(genres)
-
+            
             # Save the song to the database
             song.save()
-        
-        # Associate the user with this song
-        if user not in song.users.all():
+
+        # Associate the user with this song if not already associated
+        if not song.users.filter(id=user.id).exists():
             song.users.add(user)
             song.save()
             logger.info(f"User {user.username} added song {track_id} to their list.")
@@ -236,51 +229,25 @@ def view_top_artists(request, time_range='short_term'):
     return render(request, 'spotifyapp/view_top_artists.html', {'artists': artists, 'time_range': time_range})
 
 #Function that will show you your top genres, Later I plan to add some artists images into each genre as well
-def view_top_genres(request, time_range='short_term'):
-    top_artists = sp.current_user_top_artists(limit=50, time_range=time_range)['items']
+def view_top_genres(request):
+    user = request.user
+    user_songs = Song.objects.filter(users=user)  # Get saved songs
+
     genres = {}
-    for artist in top_artists:
-        for genre in artist.get('genres', []):
-            if genre in genres:
-                genres[genre] += 1
-            else:
-                genres[genre] = 1
+    for song in user_songs:
+        for genre in song.genres.split(', '):  # Handle multiple genres
+            if genre.strip():
+                genres[genre] = genres.get(genre, 0) + 1
+
     sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
-    genre_list = [(i+1, genre, count) for i, (genre, count) in enumerate(sorted_genres)]
-    return render(request, 'spotifyapp/view_top_genres.html', {'genres': genre_list, 'time_range': time_range})
+    genre_list = [(i + 1, genre, count) for i, (genre, count) in enumerate(sorted_genres)]
 
-#Function that will calculate the user's averages for each of the following categories, excluded instrumentalness
-#because a large number of songs have an instrumentalness of 0.0
-def calculate_user_averages():
-    averages = Song.objects.aggregate(
-        avg_danceability=Avg('danceability'),
-        avg_energy=Avg('energy'),
-        avg_valence=Avg('valence'),
-        avg_acousticness=Avg('acousticness'),
-        avg_instrumentalness=Avg('instrumentalness'),
-        avg_liveness=Avg('liveness'),
-        avg_speechiness=Avg('speechiness'),
-        avg_popularity=Avg('popularity')
-    )
-    return averages
+    # Paginate results (50 genres per page)
+    paginator = Paginator(genre_list, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
-#Works with calculate_user_averages to display them in a nicer way
-def view_user_averages(request):
-    averages = calculate_user_averages()
-
-    # Convert to percentages and round to 2 decimal places
-    context = {
-        'avg_danceability': round(averages['avg_danceability'] * 100, 2),
-        'avg_energy': round(averages['avg_energy'] * 100, 2),
-        'avg_valence': round(averages['avg_valence'] * 100, 2),
-        'avg_acousticness': round(averages['avg_acousticness'] * 100, 2),
-        'avg_instrumentalness': round(averages['avg_instrumentalness'] * 100, 2),
-        'avg_liveness': round(averages['avg_liveness'] * 100, 2),
-        'avg_speechiness': round(averages['avg_speechiness'] * 100, 2),
-        'avg_popularity': round(averages['avg_popularity'], 2)
-    }
-
-    return render(request, 'spotifyapp/view_user_averages.html', context)
+    return render(request, 'spotifyapp/view_top_genres.html', {'genres': page_obj})
 
 #Function that will add all songs that are in your library to the database, for easier use later
 def add_all_songs_to_database(request):
@@ -325,85 +292,32 @@ def add_all_songs_to_database(request):
         logger.error(f"Error adding songs to database: {e}")
         return HttpResponse("Failed to add songs to the database.")
 
-#Function that will create a playlist that has songs that have similar attributes to your averages
-def create_playlist_with_similar_attributes(request):
-    if request.method == 'POST':
-        playlist_name = request.POST.get('playlist_name')
-        
-        averages = calculate_user_averages()
-
-        # Connect to the SQLite database
-        conn = sqlite3.connect('C:/Users/nlevi/Documents/myspotifyproject/db.sqlite3')  # Use the correct path to your SQLite database
-        cursor = conn.cursor()
-
-        # Query to select a random track_id from spotifyapp_song table
-        cursor.execute("SELECT track_id FROM spotifyapp_song ORDER BY RANDOM() LIMIT 1")
-        seed_track = cursor.fetchone()
-
-        conn.close()
-
-        if seed_track:
-            seed_track_id = seed_track[0]  # Get the track_id
-        
-
-        # Retrieve user track IDs from the database
-        user_track_ids = get_all_user_tracks()  # Call the function to get track IDs
-        num_recommendations = 100
-        recommended_tracks = []
-
-        while len(recommended_tracks) < num_recommendations:
-            recommendations = sp.recommendations(
-                seed_tracks=[seed_track_id],
-                limit=100,
-                target_danceability=averages['avg_danceability'],
-                target_energy=averages['avg_energy'],
-                target_valence=averages['avg_valence'],
-                target_acousticness=averages['avg_acousticness'],
-                target_instrumentalness=averages['avg_instrumentalness'],
-                target_liveness=averages['avg_liveness'],
-                target_speechiness=averages['avg_speechiness']
-            )
-            user = request.user
-            for rec_track in recommendations['tracks']:
-                rec_track_id = rec_track.get('id')
-                if rec_track_id and rec_track_id not in user_track_ids and rec_track_id not in [track['id'] for track in recommended_tracks]:
-                    recommended_tracks.append(rec_track)
-                    get_or_create_song(rec_track, user)  # Adds song to database
-                    if len(recommended_tracks) == num_recommendations:
-                        break
-        
-        track_ids = [track['id'] for track in recommended_tracks]  # Corrected to use recommended_tracks
-        new_playlist_id = create_playlist(playlist_name)
-        add_tracks_to_playlist(new_playlist_id, track_ids)
-
-        return HttpResponse(f"Playlist '{playlist_name}' created successfully with songs matching your averages!")
-
-    return HttpResponse("Invalid request method.")
 #Function that allows you to view your top songs
 def view_top_songs(request, time_range='short_term'):
-    top_tracks = sp.current_user_top_tracks(limit=50, time_range=time_range)['items']
+    try:
+        top_tracks = sp.current_user_top_tracks(limit=50, time_range=time_range).get('items', [])
+        if not top_tracks:
+            logger.warning("No top tracks found.")
+            return render(request, 'spotifyapp/view_top_songs.html', {'songs': [], 'time_range': time_range})
 
-    songs = []
-    user = request.user
-    for i, track in enumerate(top_tracks):
-        song = get_or_create_song(track, user)
-        if song:
-            songs.append({
-                'index': i + 1,
-                'track_name': song.track_name,
-                'artist_names': song.artist_names,
-                'album_art': song.album_art,
-                'popularity': song.popularity,
-                'energy': song.energy,
-                'valence': song.valence,
-                'danceability': song.danceability,
-                'acousticness': song.acousticness,
-                'instrumentalness': song.instrumentalness,
-                'liveness': song.liveness,
-                'speechiness': song.speechiness,
-            })
+        songs = []
+        user = request.user
+        
+        for i, track in enumerate(top_tracks):
+            song = get_or_create_song(track, user)
+            if song:
+                songs.append({
+                    'index': i + 1,
+                    'track_name': song.track_name,
+                    'artist_names': song.artist_names,
+                    'album_art': song.album_art,
+                    'popularity': song.popularity,
+                })
 
-    return render(request, 'spotifyapp/view_top_songs.html', {'songs': songs, 'time_range': time_range})
+        return render(request, 'spotifyapp/view_top_songs.html', {'songs': songs, 'time_range': time_range})
+    except Exception as e:
+        logger.error(f"Error in view_top_songs: {e}")
+        return render(request, 'spotifyapp/view_top_songs.html', {'songs': [], 'time_range': time_range})
 
 #Function that gets all user tracks (Mostly used to make sure that songs added to new playlists don't already
 #exist in your library somewhere, goal it to add all new tracks.
@@ -491,148 +405,8 @@ def create_genre_playlist(request):
             return HttpResponse("Failed to create playlist.")
 
     return render(request, 'spotifyapp/view_top_genres.html')
-
-def create_recommendation_playlist(request):
-    if request.method == 'POST':
-        playlist_link = request.POST.get('playlist_link')
-        num_recommendations = int(request.POST.get('num_recommendations'))
-        playlist_name = request.POST.get('playlist_name')
-
-        playlist_id = playlist_link.split('/')[-1].split('?')[0]
-        user_track_ids = get_all_user_tracks()
-
-        # Fetch tracks from the specified playlist as seed tracks
-        tracks = sp.playlist_tracks(playlist_id)['items']
-        track_ids = [
-            track['track']['id']
-            for track in tracks
-            if track['track'] and track['track'].get('id') and not track['track'].get('is_local')
-        ]
-
-        if not track_ids:
-            logger.error("No valid tracks found in the provided playlist.")
-            return HttpResponse("No valid tracks found in the provided playlist.")
-
-        rec_track_ids = []
-        attempts = 0
-        max_attempts = 25
-
-        while len(rec_track_ids) < num_recommendations and attempts < max_attempts:
-            remaining_recommendations = num_recommendations - len(rec_track_ids)
-
-            if len(track_ids) >= 5:
-                seed_tracks = random.sample(track_ids, min(5, len(track_ids)))
-            else:
-                seed_tracks = track_ids
-
-            logger.error(f"Attempt {attempts + 1}: Using seed tracks: {seed_tracks}")
-
-            recommendations = get_recommendations(seed_tracks, min(5, remaining_recommendations), user_track_ids)
-            if not recommendations:
-                logger.error(f"No recommendations found with seed tracks: {seed_tracks}. Attempt {attempts + 1}")
-                attempts += 1
-                continue
-
-            for rec_track in recommendations:
-                if rec_track['id'] not in rec_track_ids:
-                    rec_track_ids.append(rec_track['id'])
-                if len(rec_track_ids) >= num_recommendations:
-                    break
-
-            if len(rec_track_ids) < num_recommendations:
-                attempts += 1
-
-        if rec_track_ids:
-            new_playlist_id = create_playlist(playlist_name)
-            if new_playlist_id:
-                add_tracks_to_playlist(new_playlist_id, rec_track_ids)
-                return HttpResponse(f"Playlist '{playlist_name}' created successfully with {num_recommendations} recommendations!")
-            else:
-                logger.error("Error creating new playlist.")
-                return HttpResponse("Error creating playlist.")
-        else:
-            logger.error("Unable to create playlist with the given inputs after multiple attempts.")
-            return HttpResponse("Unable to create playlist with the given inputs.")
-
-    return render(request, 'spotifyapp/create_recommendation_playlist.html')
-
-def get_recommendations(seed_tracks, num_recommendations, user_track_ids):
-    user = request.user
-    try:
-        recommended_tracks = []
-        attempts = 0
-        max_attempts = 10
-        number = 0
-
-        while len(recommended_tracks) < num_recommendations and attempts < max_attempts:
-            logger.error("Point 1")
-
-            limit = min(50, num_recommendations - len(recommended_tracks))
-            logger.error("Point 2")
-
-            if not seed_tracks:
-                logger.error("Not Seed Tracks")
-                break
-
-            try:
-                logger.error("Point 3")
-                recommendations = sp.recommendations(seed_tracks = seed_tracks, limit = limit)
-                logger.error("Point 4")
-            except Exception as e:
-                logger.error(f"Error during recommendations API call: {e}")
-                break
-
-            logger.error("Point 5")
-            tracks = recommendations.get('tracks', [])
-            if not tracks:
-                logger.error("No tracks returned from recommendations.")
-                attempts += 1
-                logger.error("Point 6")
-                if attempts < max_attempts:
-                    if len(seed_tracks) > 1:
-                        seed_tracks = random.sample(seed_tracks, min(5, len(seed_tracks)))
-                    else:
-                        logger.error("Seed tracks < 1")
-                        break
-                continue
-
-            logger.error("Point 7")
-            new_tracks_found = False
-            for rec_track in tracks:
-                rec_track_id = rec_track.get('id')
-                if rec_track_id and not rec_track.get('is_local') and rec_track_id not in user_track_ids and rec_track_id not in [track['id'] for track in recommended_tracks]:
-                    logger.error(f"{number + 1} track added")
-                    number += 1
-                    recommended_tracks.append(rec_track)
-                    get_or_create_song(rec_track, user)
-                    new_tracks_found = True
-                    
-
-                if len(recommended_tracks) >= num_recommendations:
-                    break
-
-            if not new_tracks_found:
-                attempts += 1
-                logger.error("No new tracks found in attempt %d. Adjusting seed tracks.", attempts)
-                if len(seed_tracks) > 1:
-                    seed_tracks = random.sample(seed_tracks, min(5, len(seed_tracks)))
-                else:
-                    break
-
-        return recommended_tracks
-
-    except spotipy.SpotifyException as e:
-        logger.error(f"Spotify API Error: {e}")
-        return []
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request Error: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"Error Fetching Recommendations: {e}")
-        return []
     
 def get_recently_played_tracks():
-    user = request.user
     try:
         results = sp.current_user_recently_played(limit=50)
         tracks = results['items']
@@ -644,7 +418,7 @@ def get_recently_played_tracks():
         for item in tracks:
             track = item['track']
             if track is not None:
-                get_or_create_song(track, user)
+                get_or_create_song(track)
 
         return tracks
     except spotipy.SpotifyException as e:
