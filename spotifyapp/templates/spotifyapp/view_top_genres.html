@@ -1,0 +1,58 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Genres</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/styles.css' %}">
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <h1 class="test-element">Top Genres</h1>
+        </header>
+        <div class="container">
+            <nav>
+                <div class="sub-menu">
+                    <a href="{% url 'index' %}">Main Menu</a>
+                </div>
+            </nav>
+            <nav>
+                <div class="sub-menu">
+                    <a href="{% url 'view_top_genres_time' 'short_term' %}">4 Weeks</a>
+                    <a href="{% url 'view_top_genres_time' 'medium_term' %}">6 Months</a>
+                    <a href="{% url 'view_top_genres_time' 'long_term' %}">12 Months</a>
+                </div>
+            </nav>
+            <form action="{% url 'create_genre_playlist' %}" method="post">
+                {% csrf_token %}
+                <label for="explore_a_genre">Select a genre to create a playlist:</label><br>
+                <select id="explore_a_genre" name="explore_a_genre">
+                    {% for genre in genres %}
+                        <option value="{{ genre.1 }}">{{ genre.1 }}</option>
+                    {% endfor %}
+                </select><br><br>
+                <button type="submit">Create Playlist</button>
+            </form>
+            <div class="artist-grid">
+                {% for genre in genres %}
+                <div class="artist-item">
+                    <div class="artist-info">
+                        {{ genre.0 }}. {{ genre.1 }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <footer>
+            <div class="handles">
+                <p>2024 Nathan Morris</p>
+                <a href="https://www.instagram.com/natem.og" target="_blank">Instagram</a>
+                <a href="https://open.spotify.com/user/nlevim" target="_blank">Spotify</a>
+                <a href="https://www.linkedin.com/in/nate-morris-data" target="_blank">LinkedIn</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

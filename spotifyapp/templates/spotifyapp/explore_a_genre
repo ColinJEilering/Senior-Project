@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Top Songs</title>
+</head>
+<body>
+    <h1>Top Songs</h1>
+    <table>
+        <tr>
+            <th>Number</th>
+            <th>Song Name</th>
+            <th>Artists</th>
+        </tr>
+        {% for number, name, artists in songs %}
+        <tr>
+            <td>{{ number }}</td>
+            <td>{{ name }}</td>
+            <td>{{ artists }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

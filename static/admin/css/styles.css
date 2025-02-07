@@ -1,0 +1,212 @@
+/* Basic styling for the main menu */
+.main-menu {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    height: 40vh; /* Adjust the height as needed */
+}
+
+.main-menu a {
+    align-items: center;
+    text-decoration: none;
+    font-size: 24px;
+    padding: 20px;
+    background-color: #901FC8; /* Darker grey background for buttons */
+    border: 1px solid #000001; /* Slightly lighter grey for borders */
+    margin: 10px;
+    width: 100%; /* Adjust the width as needed */
+    text-align: center;
+    display: block;
+    color: #ffffff; /* White text */
+}
+
+.main-menu a:hover {
+    background-color: #D88DFE; /* Slightly lighter grey on hover */
+}
+
+.handles {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    height: 10vh; /* Adjust the height as needed */
+    margin: 0 5px;
+    text-decoration: none;
+    color: #ffffff;
+}
+
+.handles a {
+    text-decoration: none;
+    font-size: 12px;
+    padding: 20px;
+    background-color: #901FC8; /* Darker grey background for buttons */
+    border: 1px solid #000001; /* Slightly lighter grey for borders */
+    margin: 10px;
+    width: 100px; /* Adjust the width as needed */
+    text-align: center;
+    display: block;
+    color: #ffffff; /* White text */
+}
+
+.handles a:hover {
+    background-color: #D88DFE; /* Slightly lighter grey on hover */
+}
+
+.sub-menu {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    height: 10vh; /* Adjust the height as needed */
+    margin: 0 5px;
+    text-decoration: none;
+    color: #000;
+}
+
+.sub-menu a {
+    text-decoration: none;
+    font-size: 12px;
+    padding: 20px;
+    background-color: #901FC8; /* Darker grey background for buttons */
+    border: 1px solid #000001; /* Slightly lighter grey for borders */
+    margin: 10px;
+    width: 100px; /* Adjust the width as needed */
+    text-align: center;
+    display: block;
+    color: #ffffff; /* White text */
+}
+
+.sub-menu a:hover {
+    background-color: #D88DFE; /* Slightly lighter grey on hover */
+}
+
+/* Test element */
+.test-element {
+    text-align: center;
+    font-size: 48px;
+    height: 2vh;
+    color: White; /* This should make the text yellow */
+}
+
+body {
+    background-color: #0F0026; /* Black background */
+    color: #ffffff; /* White text */
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex-grow: 1;
+    min-height: 100vh;
+}
+
+.container {
+    flex: 1;
+    padding-bottom: 60px;
+}
+
+footer {
+    background-color: #0F0026;
+    text-align: center;
+    padding: 10px;
+    margin-top: auto;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+/* Styles for the artist grid */
+.artist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    justify-content: center;
+    padding: 20px;
+}
+
+.artist-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background-color: #1A0033;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.artist-item img {
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.artist-info {
+    margin-bottom: 10px;
+}
+/* Add this to the bottom of your existing styles.css file */
+
+/* Tooltip container */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 150px;
+    background-color: #000;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%; /* Position above the tooltip element */
+    left: 50%;
+    margin-left: -75px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* Tooltip arrow */
+.tooltip .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #000 transparent transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Grid container for songs */
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.grid-item img {
+    width: 100%;
+    height: auto;
+}

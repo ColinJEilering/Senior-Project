@@ -1,0 +1,114 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Playlist with Similar Attributes</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/styles.css' %}">
+    <style>
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 250px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .stats {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .button-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .song-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
+            justify-items: center;
+        }
+
+        .song-item {
+            text-align: center;
+        }
+
+        .song-info {
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <h1>Create Playlist with Similar Attributes</h1>
+        </header>
+        <div class="container">
+            <div class="stats">
+                <p><strong>Average Energy:</strong> {{ average_energy }}</p>
+                <p><strong>Average Valence:</strong> {{ average_valence }}</p>
+				<p><strong>Average Danceability:</strong> {{ average_danceability }}</p>
+				<p><strong>Average Accousticness:</strong> {{ average_acousticness }}</p>
+				<p><strong>Average Instrumentalness:</strong> {{ average_instrumentalness }}</p>
+				<p><strong>Average Liveness:</strong> {{ average_liveness }}</p>
+				<p><strong>Average Speechiness:</strong> {{ average_speechiness }}</p>
+            </div>
+            <div class="button-container">
+                <form method="post" action="{% url 'create_playlist_with_similar_attributes' %}">
+                    {% csrf_token %}
+                    <button type="submit">Create Playlist with Similar Attributes</button>
+                </form>
+            </div>
+            <div class="song-grid">
+                {% for song in matching_songs %}
+                <div class="song-item">
+                    <div class="tooltip">
+                        <img src="{{ song.album_art }}" alt="{{ song.track_name }}">
+                        <div class="song-info">
+                            {{ song.track_name }} by {{ song.artist_names }}
+                        </div>
+                        <span class="tooltiptext">
+                            <strong>Popularity:</strong> {{ song.popularity }} <br>
+                            <strong>Danceability:</strong> {{ song.danceability }}<br>
+                            <strong>Energy:</strong> {{ song.energy }}<br>
+                            <strong>Valence:</strong> {{ song.valence }}<br>
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <footer>
+            <div class="handles">
+                <p>2024 Nathan Morris</p>
+                <a href="https://www.instagram.com/natem.og" target="_blank">Instagram</a>
+                <a href="https://open.spotify.com/user/nlevim" target="_blank">Spotify</a>
+                <a href="https://www.linkedin.com/in/nate-morris-data" target="_blank">LinkedIn</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

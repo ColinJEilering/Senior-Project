@@ -1,0 +1,36 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listening Habits</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/styles.css' %}">
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <h1 class="test-element">Listening Habits</h1>
+        </header>
+        <div class="container">
+            <nav>
+                <div class="sub-menu">
+                    <a href="{% url 'index' %}">Main Menu</a>
+                </div>
+            </nav>
+            <div>
+                {{ plot_time_div|safe }}
+                {{ plot_genre_div|safe }}
+            </div>
+        </div>
+        <footer>
+            <div class="handles">
+                <p>2024 Nathan Morris</p>
+                <a href="https://www.instagram.com/natem.og" target="_blank">Instagram</a>
+                <a href="https://open.spotify.com/user/nlevim" target="_blank">Spotify</a>
+                <a href="https://www.linkedin.com/in/nate-morris-data" target="_blank">LinkedIn</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
