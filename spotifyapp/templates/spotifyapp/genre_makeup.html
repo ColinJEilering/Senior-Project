@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="{% static 'admin/js/node_modules/chart.js/dist/chart.js' %}"></script>
+</head>
+<body>
+    <canvas id="myChart" style="width:100%;max-width:600px"></canvas>
+    
+    <script>
+        // Fetch genre data from the Django backend
+        fetch("/genre_makeup/")
+            .then(response => response.json())
+            .then(data => {
+                var xValues = data.labels; // Genre names
+                var yValues = data.data; // Counts
+                var barColors = ["#b91d47", "#00aba9", "#2b5797", "#e8c3b9", "#1e7145"];
+                
+                new Chart("myChart", {
+                    type: "pie",
+                    data: {
+                        labels: xValues,
+                        datasets: [{
+                            backgroundColor: barColors,
+                            data: yValues
+                        }]
+                    },
+                    options: {
+                        title: {
+                            display: true,
+                            text: "Your Genre Breakdown"
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error("Error fetching genre data:", error));
+    </script>
+</body>
+</html>

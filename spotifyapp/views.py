@@ -8,12 +8,15 @@ from django.contrib.auth import authenticate, login, logout
 import environ
 import os
 import requests
+from django.contrib.auth.forms import UserCreationForm
 import logging
 from myspotifyproject.settings import BASE_DIR
 from .models import Song
 from django.db.models import Avg
 import time
 from django.conf import settings
+from collections import Counter
+
 
 
 #So I found out that Spotify depreciated a lot of their endpoints, so we will have to figure out new ways
@@ -132,7 +135,7 @@ def login_view(request):
         if user is not None:
             login(request, user)
             logger.info(f"User {username} successfully logged in.")
-            return render(request, "spotifyapp/dashboard.html")
+            return render(request, "spotifyapp/index.html")
         else:
             logger.warning("Invalid login attempt.")
             return HttpResponse("Invalid username or password")
@@ -155,6 +158,26 @@ def register_view(request):
     else:
         form = UserCreationForm()
     return render(request, "spotifyapp/register.html", {"form": form})
+
+def genre_breakdown(request):
+    # Retrieve all genres from the Song model
+    all_genres = Song.objects.values_list('genres', flat=True)
+    
+    # Flatten and count occurrences of each genre
+    genre_counter = Counter()
+    for genre_list in all_genres:
+        if genre_list:  # Ensure genre_list is not None or empty
+            genres = genre_list.split(',')  # Assuming genres are stored as comma-separated values
+            genre_counter.update(genres)
+    
+    # Prepare data for Chart.js
+    labels = list(genre_counter.keys())
+    data = list(genre_counter.values())
+    
+    return JsonResponse({"labels": labels, "data": data})
+
+def genre_makeup_view(request):
+    return render(request, 'genre_makeup.html')
 
 #Function that will get the playlist id from the link
 def extract_playlist_id(playlist_link):
@@ -363,7 +386,9 @@ def add_tracks_to_playlist(playlist_id, track_ids):
         logger.error(f"Error adding tracks to playlist: {e}")
 
 def create_genre_playlist(request):
+    logger.debug("Debug message: 1")
     user = request.user
+    logger.debug("Debug message: 1")
     if request.method == 'POST':
         genre = request.POST.get('explore_a_genre')
         logger.debug("Debug message: 1")
@@ -372,7 +397,7 @@ def create_genre_playlist(request):
         genre_tracks = []
         offset = 0
         logger.debug("Debug message: 2")
-        while len(genre_tracks) < 50 and offset < 1000:  # Limit search to first 1000 tracks
+        while len(genre_tracks) < 50 and offset < 3000:  # Limit search to first 1000 tracks
             results = sp.search(q=f'genre:"{genre}"', type='track', limit=50, offset=offset)
             logger.debug("Debug message: 3")
             tracks = results['tracks']['items']

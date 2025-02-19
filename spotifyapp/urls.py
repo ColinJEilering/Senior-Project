@@ -12,6 +12,7 @@ urlpatterns = [
     path("login_view/", views.login_view, name="login_view"),  # Ensure this line is present
     path("logout/", views.logout_view, name="logout"),
     path("register/", views.register_view, name="register"),
+    path("genre_makeup/", views.genre_breakdown, name="genre_makeup"),
     
     path('add_all_songs_to_database/', views.add_all_songs_to_database, name='add_all_songs_to_database'),
     path('view_top_artists/', views.view_top_artists, name='view_top_artists'),
