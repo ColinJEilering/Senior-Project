@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import UserCreationForm
 import environ
 import os
 import requests
@@ -132,7 +133,7 @@ def login_view(request):
         if user is not None:
             login(request, user)
             logger.info(f"User {username} successfully logged in.")
-            return render(request, "spotifyapp/dashboard.html")
+            return render(request, "spotifyapp/index.html")
         else:
             logger.warning("Invalid login attempt.")
             return HttpResponse("Invalid username or password")
@@ -149,7 +150,7 @@ def register_view(request):
         if form.is_valid():
             user = form.save()
             logger.info(f"New user registered: {user.username}")
-            return redirect("login")
+            return redirect("login_view")
         else:
             logger.warning("User registration failed due to invalid form data.")
     else:
