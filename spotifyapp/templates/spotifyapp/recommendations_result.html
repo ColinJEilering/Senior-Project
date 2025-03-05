@@ -1,0 +1,149 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recommendations</title>
+  <link rel="stylesheet" href="{% static 'admin/css/styles.css' %}">
+  <style>
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black;
+      }
+      .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 250px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px 0;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -125px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+      }
+    #player-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #222;
+      color: #fff;
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+    #player-bar button {
+      margin: 0 5px;
+      padding: 5px 10px;
+      background: #901FC8;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Your existing content displaying recommendations -->
+    <div class="container">
+      <!-- For example, your grid of recommended tracks -->
+      <div class="artist-grid">
+        {% for track in tracks %}
+        <div class="artist-item">
+          <div class="tooltip">
+            <div class="artist-info">
+              {{ track.index }}. {{ track.track_name }} by {{ track.artist_names }}
+            </div>
+            <img src="{{ track.album_art }}" alt="{{ track.track_name }}">
+            <span class="tooltiptext">
+              <strong>Popularity:</strong> {{ track.popularity }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Player Bar at the bottom -->
+  <div id="player-bar">
+    <button id="prev">Previous</button>
+    <button id="play-pause">Play/Pause</button>
+    <button id="next">Next</button>
+    <button id="like">Like</button>
+  </div>
+
+  <!-- Include the Spotify Web Playback SDK -->
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script>
+    // Replace with a method to retrieve the OAuth token from your session or via your backend
+    const token = "{{ request.session.token_info.access_token|default:'' }}";
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const player = new Spotify.Player({
+        name: 'My Web Player',
+        getOAuthToken: cb => { cb(token); },
+        volume: 0.5
+      });
+
+      // Error handling
+      player.addListener('initialization_error', ({ message }) => { console.error(message); });
+      player.addListener('authentication_error', ({ message }) => { console.error(message); });
+      player.addListener('account_error', ({ message }) => { console.error(message); });
+      player.addListener('playback_error', ({ message }) => { console.error(message); });
+
+      // Ready event
+      player.addListener('ready', ({ device_id }) => {
+        console.log('Ready with Device ID', device_id);
+        // Optionally, transfer playback to the new device
+      });
+
+      // Toggle play/pause
+      document.getElementById('play-pause').addEventListener('click', () => {
+        player.togglePlay();
+      });
+      document.getElementById('next').addEventListener('click', () => {
+        player.nextTrack();
+      });
+      document.getElementById('prev').addEventListener('click', () => {
+        player.previousTrack();
+      });
+      document.getElementById('like').addEventListener('click', () => {
+        player.getCurrentState().then(state => {
+          if (state) {
+            const trackId = state.track_window.current_track.id;
+            // Send an AJAX request to like the track
+            fetch("{% url 'like_track' %}", {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+              },
+              body: JSON.stringify({ track_id: trackId })
+            }).then(response => {
+              if (response.ok) {
+                console.log('Track liked!');
+              } else {
+                console.error('Error liking track.');
+              }
+            }).catch(err => console.error(err));
+          }
+        });
+      });
+    };
+  </script>
+</body>
+</html>
