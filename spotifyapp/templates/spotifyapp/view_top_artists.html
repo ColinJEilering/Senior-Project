@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Artists</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/styles.css' %}">
+    <style>
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 150px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -75px; /* Use half of the width (150 / 2), to center the tooltip */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <h1 class="test-element">Top Artists - {{ time_range }}</h1>
+        </header>
+        <div class="container">
+            <nav>
+                <div class="sub-menu">
+                    <a href="{% url 'index' %}">Main Menu</a>
+                </div>
+            </nav>
+            <nav>
+                <div class="sub-menu">
+                    <a href="{% url 'view_top_artists_time' 'short_term' %}">4 Weeks</a>
+                    <a href="{% url 'view_top_artists_time' 'medium_term' %}">6 Months</a>
+                    <a href="{% url 'view_top_artists_time' 'long_term' %}">12 Months</a>
+                </div>
+            </nav>
+            <div class="artist-grid">
+                {% for artist in artists %}
+                <div class="artist-item">
+                    <div class="tooltip">
+                        <div class="artist-info">
+                            {{ artist.0 }}. {{ artist.1 }}
+                        </div>
+                        <img src="{{ artist.2 }}" alt="{{ artist.1 }}">
+                        <span class="tooltiptext">
+                            Popularity: {{ artist.3 }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <footer>
+            <div class="handles">
+                <p>2024 Nathan Morris</p>
+                <a href="https://www.instagram.com/natem.og" target="_blank">Instagram</a>
+                <a href="https://open.spotify.com/user/nlevim" target="_blank">Spotify</a>
+                <a href="https://www.linkedin.com/in/nate-morris-data" target="_blank">LinkedIn</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

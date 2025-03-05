@@ -1,0 +1,35 @@
+body {
+    background-color: #1c1c1c; /* Dark grey/almost black background */
+    color: #ffffff; /* White text */
+    font-family: Arial, sans-serif; /* Specify your preferred font */
+}
+
+.container {
+    width: 80%;
+    margin: 0 auto;
+    padding-top: 20px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #ffffff; /* White headers */
+}
+
+.button {
+    background-color: transparent;
+    border: 2px solid #ffffff; /* White outline */
+    color: #ffffff; /* White text */
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 10px 0;
+    transition-duration: 0.4s;
+    font-family: Arial, sans-serif; /* Specify your preferred font */
+}
+
+.button:hover {
+    background-color: #ffffff; /* White background on hover */
+    color: #1c1c1c; /* Dark grey/almost black text on hover */
+}

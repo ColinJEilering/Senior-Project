@@ -1,0 +1,177 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Genres</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/styles.css' %}">
+    <style>
+        /* Popup Styles */
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #0F0026;
+            padding: 20px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            z-index: 1000;
+            text-align: center;
+        }
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .popup button {
+            margin-top: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .artist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .artist-item {
+            background-color: #901FC8;
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .artist-item:hover {
+            transform: scale(1.05);
+            backgound-color: #D88DFE;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination-button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            background: #901FC8;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .pagination-button:hover {
+            background: #D88DFE;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <h1 class="test-element">Top Genres</h1>
+        </header>
+        <div class="container">
+            <nav>
+                <div class="sub-menu">
+                    <a href="{% url 'index' %}">Main Menu</a>
+                </div>
+            </nav>
+
+            <div class="artist-grid">
+                {% for genre in genres %}
+                <div class="artist-item" data-genre="{{ genre.1 }}">
+                    <div class="artist-info">
+                        {{ genre.0 }}. {{ genre.1 }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="pagination">
+                {% if genres.has_previous %}
+                    <a href="?page={{ genres.previous_page_number }}" class="pagination-button">Back</a>
+                {% endif %}
+                <span>Page {{ genres.number }} of {{ genres.paginator.num_pages }}</span>
+                {% if genres.has_next %}
+                    <a href="?page={{ genres.next_page_number }}" class="pagination-button">Next</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Popup Overlay -->
+        <div class="popup-overlay" id="popupOverlay"></div>
+
+        <!-- Genre Popup -->
+        <div class="popup" id="genrePopup">
+            <h2 id="popupTitle"></h2>
+            <form action="{% url 'create_genre_playlist' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" id="popupGenreInput" name="explore_a_genre">
+
+                <!-- Dropdown for number of songs -->
+                <label for="num_songs">Number of Songs:</label>
+                <select id="num_songs" name="num_songs">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="30">30</option>
+                    <option value="40">40</option>
+                    <option value="50">50</option>
+                </select>
+
+                <br><br>
+                <button type="submit">Create Playlist</button>
+                <button type="button" id="closePopup">Close</button>
+            </form>
+        </div>
+
+        <footer>
+            <div class="handles">
+                <p>2024 Nathan Morris</p>
+                <a href="https://www.instagram.com/natem.og" target="_blank">Instagram</a>
+                <a href="https://open.spotify.com/user/nlevim" target="_blank">Spotify</a>
+                <a href="https://www.linkedin.com/in/nate-morris-data" target="_blank">LinkedIn</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const genreBoxes = document.querySelectorAll(".artist-item");
+            const popupOverlay = document.getElementById("popupOverlay");
+            const genrePopup = document.getElementById("genrePopup");
+            const popupTitle = document.getElementById("popupTitle");
+            const popupGenreInput = document.getElementById("popupGenreInput");
+            const closePopupButton = document.getElementById("closePopup");
+
+            genreBoxes.forEach(box => {
+                box.addEventListener("click", function() {
+                    const genre = this.dataset.genre;
+                    popupTitle.textContent = `Explore: ${genre}`;
+                    popupGenreInput.value = genre;
+                    genrePopup.style.display = "block";
+                    popupOverlay.style.display = "block";
+                });
+            });
+
+            closePopupButton.addEventListener("click", function() {
+                genrePopup.style.display = "none";
+                popupOverlay.style.display = "none";
+            });
+
+            popupOverlay.addEventListener("click", function() {
+                genrePopup.style.display = "none";
+                popupOverlay.style.display = "none";
+            });
+        });
+    </script>
+</body>
+</html>
