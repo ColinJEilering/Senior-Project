@@ -517,6 +517,8 @@ def get_recommendations(request):
             # Retrieve the weights from the form
             weight_genres   = int(request.POST.get("weight_genres", 25))
             weight_artists  = int(request.POST.get("weight_artists", 25))
+            num_songs       = int(request.POST.get("num_songs",20))
+            playlist_name   = request.POST.get("playlist_name", "Recommended Playlist")
                         
             # Optional fields
             year_filter = request.POST.get("year_filter", "").strip()  # e.g. "1990" or "1990-2000"
@@ -588,9 +590,12 @@ def get_recommendations(request):
 
             # Fetch detailed info for top recommendations and store/update in DB
             recommended_tracks = []
-            for i, track_id in enumerate(combine_candidates(candidate_scores)):
+            for i, track_id in enumerate(recommended_track_ids):
                 # Only consider this track if it isn't already in the user's library.
+                print(Song.objects.filter(track_id=track_id, users=request.user).query)
+                print(Song.objects.filter(track_id=track_id, users=request.user).exists())
                 if Song.objects.filter(track_id=track_id, users=request.user).exists():
+                    recommended_track_ids.remove(track_id)
                     continue
 
                 try:
@@ -610,8 +615,18 @@ def get_recommendations(request):
                     continue
 
                 # Stop once we have 20 recommendations.
-                if len(recommended_tracks) >= 20:
+                if len(recommended_tracks) >= num_songs:
                     break
+                new_playlist_id = create_playlist(playlist_name)
+                logger.debug("Debug message: 8")
+                if new_playlist_id:
+                    # Add up to num_songs tracks instead of 50
+                    add_tracks_to_playlist(new_playlist_id, recommended_track_ids[:num_songs])
+                    return render(request, 'spotifyapp/recommendations_result.html', {
+                        'tracks': recommended_tracks,
+                    })
+                else:
+                    return HttpResponse("Failed to create playlist.")
 
             return render(request, 'spotifyapp/recommendations_result.html', {
                 'tracks': recommended_tracks,
