@@ -128,6 +128,7 @@ def test_spotify_connection(request):
         logger.error(f"Error connecting to Spotify API: {e}")
         return HttpResponse(f"Error connecting to Spotify API: {e}", status=500)
 
+@csrf_exempt
 def login_view(request):
     if request.method == "POST":
         username = request.POST["username"]
@@ -607,7 +608,7 @@ def get_recommendations(request):
                     logger.error(f"Error fetching details for track {track_id}: {e}")
                     continue
 
-                # Stop once we have 20 recommendations.
+                # Stop once we have num_songs recommendations.
                 if len(recommended_tracks) >= num_songs:
                     break
                 new_playlist_id = create_playlist(playlist_name)
