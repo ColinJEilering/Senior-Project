@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recommendations</title>
+  <link rel="stylesheet" href="{% static 'admin/css/styles.css' %}">
+  <style>
+    .slider-container, .input-container {
+      margin-bottom: 15px;
+    }
+    .slider-label, .input-label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .toggle-container {
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <h1>Personalized Recommendations</h1>
+    </header>
+    <div class="container">
+      <form action="{% url 'get_recommendations' %}" method="post">
+        {% csrf_token %}
+        <!-- Existing Sliders -->
+        <div class="slider-container">
+          <label class="slider-label" for="weight_genres">
+            How much you want your genres to play a role: <span id="val_genres">25</span>
+          </label>
+          <input type="range" id="weight_genres" name="weight_genres" min="0" max="100" value="25"
+                 oninput="document.getElementById('val_genres').innerText = this.value">
+        </div>
+        <div class="slider-container">
+          <label class="slider-label" for="weight_artists">
+            How much you want your artists to play a role: <span id="val_artists">25</span>
+          </label>
+          <input type="range" id="weight_artists" name="weight_artists" min="0" max="100" value="25"
+                 oninput="document.getElementById('val_artists').innerText = this.value">
+        </div>
+        <!-- Optional Year Filter -->
+        <div class="input-container">
+          <label class="input-label" for="year_filter">Year (or range, e.g. 1990 or 1990-2000):</label>
+          <input type="text" id="year_filter" name="year_filter" placeholder="Optional">
+        </div>
+        <!-- Hipster Toggle -->
+        <div class="toggle-container">
+          <label for="hipster_mode">
+            <input type="checkbox" id="hipster_mode" name="hipster_mode" value="on">
+            Enable Hipster Mode (search albums with tag:hipster)
+          </label>
+        </div>
+        <button type="submit">Get Recommendations</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

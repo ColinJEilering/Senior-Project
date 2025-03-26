@@ -14,3 +14,12 @@ class Song(models.Model):
 
     def __str__(self):
         return self.track_name
+
+class ListeningHistory(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    song = models.ForeignKey(Song, on_delete=models.CASCADE)
+    played_at = models.DateTimeField(auto_now_add=True)
+    # Optional: How long the song was played, or if completed
+    duration_listened = models.PositiveIntegerField(null=True, blank=True)  # in seconds
+    def __str__(self):
+        return f"{self.user.username} listened to {self.song.track_name} on {self.timestamp}"

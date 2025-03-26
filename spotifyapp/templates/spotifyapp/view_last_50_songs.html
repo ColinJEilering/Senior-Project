@@ -4,15 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Top Songs</title>
+    <title>Recent Listens</title>
     <link rel="stylesheet" type="text/css" href="{% static 'admin/css/styles.css' %}">
     <style>
+        
         .tooltip {
             position: relative;
             display: inline-block;
-            border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
         }
-
         .tooltip .tooltiptext {
             visibility: hidden;
             width: 250px;
@@ -25,11 +24,10 @@
             z-index: 1;
             bottom: 125%;
             left: 50%;
-            margin-left: -125px; /* Use half of the width (250 / 2), to center the tooltip */
+            margin-left: -125px;
             opacity: 0;
             transition: opacity 0.3s;
         }
-
         .tooltip:hover .tooltiptext {
             visibility: visible;
             opacity: 1;
@@ -39,19 +37,12 @@
 <body>
     <div class="wrapper">
         <header>
-            <h1 class="test-element">Top Songs - {{ time_range }}</h1>
+            <h1 class="test-element">Recent Listens - {{ time_range }}</h1>
         </header>
         <div class="container">
             <nav>
                 <div class="sub-menu">
                     <a href="{% url 'index' %}">Main Menu</a>
-                </div>
-            </nav>
-            <nav>
-                <div class="sub-menu">
-                    <a href="{% url 'view_top_songs_time' 'short_term' %}">4 Weeks</a>
-                    <a href="{% url 'view_top_songs_time' 'medium_term' %}">6 Months</a>
-                    <a href="{% url 'view_top_songs_time' 'long_term' %}">12 Months</a>
                 </div>
             </nav>
             <div class="artist-grid">
@@ -63,15 +54,14 @@
                         </div>
                         <img src="{{ song.album_art }}" alt="{{ song.track_name }}">
                         <span class="tooltiptext">
-                            <strong>Popularity:</strong> {{ song.popularity }} <br>
+                            <strong>Popularity:</strong> {{ song.popularity }}<br>
                         </span>
                     </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
-        <footer>
-        </footer>
+        <footer></footer>
     </div>
 </body>
 </html>
