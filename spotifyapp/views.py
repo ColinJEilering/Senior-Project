@@ -434,23 +434,19 @@ def create_genre_playlist(request):
         except ValueError:
             num_songs = 50
 
-        logger.debug("Debug message: 1")
-        user_track_ids = get_all_user_tracks()
+#        user_track_ids = get_all_user_tracks()
 
         genre_tracks = []
         offset = 0
-        logger.debug("Debug message: 2")
         # Use the num_songs value instead of hardcoding 50
-        while len(genre_tracks) < num_songs and offset < 1000:  # Limit search to first 1000 tracks
+        while len(genre_tracks) < num_songs and offset < 500:  # Limit search to first 500 tracks
             results = sp.search(q=f'genre:"{genre}"', type='track', limit=50, offset=offset)
-            logger.debug("Debug message: 3")
             tracks = results['tracks']['items']
             for track in tracks:
-                logger.debug("Debug message: 4")
-                if track['id'] not in user_track_ids:
-                    genre_tracks.append(track)
-                    get_or_create_song(track, user)
-                logger.debug("Debug message: 5")
+                track_id = track['id']
+                if Song.objects.filter(track_id=track_id, users=request.user).exists():
+                    continue                    
+                genre_tracks.append(track)
                 if len(genre_tracks) >= num_songs:
                     break
             offset += 50
@@ -460,13 +456,10 @@ def create_genre_playlist(request):
             print(f"No tracks found for genre: {genre}")
             return HttpResponse("No tracks found for the specified genre.")
 
-        logger.debug("Debug message: 6")
         genre_track_ids = [track['id'] for track in genre_tracks]
         random.shuffle(genre_track_ids)
-        logger.debug("Debug message: 7")
         playlist_name = f"{genre} Playlist"
         new_playlist_id = create_playlist(playlist_name)
-        logger.debug("Debug message: 8")
         if new_playlist_id:
             # Add up to num_songs tracks instead of 50
             add_tracks_to_playlist(new_playlist_id, genre_track_ids[:num_songs])
@@ -517,6 +510,8 @@ def get_recommendations(request):
             # Retrieve the weights from the form
             weight_genres   = int(request.POST.get("weight_genres", 25))
             weight_artists  = int(request.POST.get("weight_artists", 25))
+            num_songs       = int(request.POST.get("num_songs",20))
+            playlist_name   = request.POST.get("playlist_name", "Recommended Playlist")
                         
             # Optional fields
             year_filter = request.POST.get("year_filter", "").strip()  # e.g. "1990" or "1990-2000"
@@ -538,7 +533,7 @@ def get_recommendations(request):
                     if g:
                         genres[g] = genres.get(g, 0) + 1
             sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
-            top_genres = [genre for genre, count in sorted_genres[:10]]  # top 10 genres
+            top_genres = [genre for genre, count in sorted_genres[:20]]  # top 20 genres
 
             for genre in top_genres:
                 # Build a search query for the genre
@@ -588,9 +583,12 @@ def get_recommendations(request):
 
             # Fetch detailed info for top recommendations and store/update in DB
             recommended_tracks = []
-            for i, track_id in enumerate(combine_candidates(candidate_scores)):
+            for i, track_id in enumerate(recommended_track_ids):
                 # Only consider this track if it isn't already in the user's library.
+                print(Song.objects.filter(track_id=track_id, users=request.user).query)
+                print(Song.objects.filter(track_id=track_id, users=request.user).exists())
                 if Song.objects.filter(track_id=track_id, users=request.user).exists():
+                    recommended_track_ids.remove(track_id)
                     continue
 
                 try:
@@ -610,8 +608,18 @@ def get_recommendations(request):
                     continue
 
                 # Stop once we have 20 recommendations.
-                if len(recommended_tracks) >= 20:
+                if len(recommended_tracks) >= num_songs:
                     break
+                new_playlist_id = create_playlist(playlist_name)
+                logger.debug("Debug message: 8")
+                if new_playlist_id:
+                    # Add up to num_songs tracks instead of 50
+                    add_tracks_to_playlist(new_playlist_id, recommended_track_ids[:num_songs])
+                    return render(request, 'spotifyapp/recommendations_result.html', {
+                        'tracks': recommended_tracks,
+                    })
+                else:
+                    return HttpResponse("Failed to create playlist.")
 
             return render(request, 'spotifyapp/recommendations_result.html', {
                 'tracks': recommended_tracks,
@@ -624,7 +632,7 @@ def get_recommendations(request):
         return render(request, 'spotifyapp/recommendations.html')
     
 @login_required
-@csrf_exempt  # if using AJAX and you handle CSRF via JS; otherwise, ensure your request sends CSRF token
+@csrf_exempt  
 def like_track(request):
     if request.method == "POST":
         try:
@@ -634,7 +642,6 @@ def like_track(request):
                 return JsonResponse({"error": "No track_id provided."}, status=400)
 
             # Use the Spotipy client (ensure you have a valid access token from session or elsewhere)
-            # Here we assume `sp` is a globally available authenticated Spotipy client
             result = sp.current_user_saved_tracks_add([track_id])
             # Optionally, update your database as well. For example, you might want to record that the user "liked" it.
             return JsonResponse({"success": True})

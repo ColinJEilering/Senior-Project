@@ -27,6 +27,14 @@
       <form action="{% url 'get_recommendations' %}" method="post">
         {% csrf_token %}
         <!-- Existing Sliders -->
+        <div class="input-container">
+          <label class="input-label" for="playlist_name">Name of New Playlist:</label>
+          <input type="text" id="playlist_name" name="playlist_name" placeholder="Playlist Name">
+        </div>
+        <div class="input-container">
+          <label class="input-label" for="num_songs">Number of Songs (Max of 50):</label>
+          <input type="Number" id="num_songs" name="num_songs" default="25" max="50">
+        </div>
         <div class="slider-container">
           <label class="slider-label" for="weight_genres">
             How much you want your genres to play a role: <span id="val_genres">25</span>
