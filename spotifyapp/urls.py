@@ -13,6 +13,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("register/", views.register_view, name="register"),
     
+    
     path('add_all_songs_to_database/', views.add_all_songs_to_database, name='add_all_songs_to_database'),
     path('view_top_artists/', views.view_top_artists, name='view_top_artists'),
     path('view_top_artists/<str:time_range>/', views.view_top_artists, name='view_top_artists_time'),
@@ -21,7 +22,6 @@ urlpatterns = [
     path('view_top_songs/', views.view_top_songs, name='view_top_songs'),
     path('recommendations/', views.get_recommendations, name='get_recommendations'),
     path('last_50_played/', views.view_last_50_listens, name='view_last_50_songs'),
-    path('like_track/', views.like_track, name='like_track'),
     path('view_top_songs/<str:time_range>/', views.view_top_songs, name='view_top_songs_time'),
     path('create_genre_playlist/', views.create_genre_playlist, name='create_genre_playlist'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
