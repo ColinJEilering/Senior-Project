@@ -18,6 +18,8 @@ import time
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 import time
+from django.core.cache import cache
+
 
 
 
@@ -238,121 +240,130 @@ def view_top_artists(request, time_range='short_term'):
 @login_required
 def view_top_genres(request):
     user = request.user
-    user_songs = Song.objects.filter(users=user)
+    cache_key = f"user_top_genres_{user.id}"
+    page_number = request.GET.get('page', 1)
 
-    # Build a dictionary of genre counts
-    genres = {}
-    for song in user_songs:
-        for genre in song.genres.split(', '):
-            genre = genre.strip()
-            if genre:
-                genres[genre] = genres.get(genre, 0) + 1
+    cached_genre_list = cache.get(cache_key)
+    if not cached_genre_list:
+        user_songs = Song.objects.filter(users=user)
 
-    # Sort genres by count (most listened first)
-    sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
-    genre_list = []
+        # Build a dictionary of genre counts
+        genres = {}
+        for song in user_songs:
+            for genre in song.genres.split(', '):
+                genre = genre.strip()
+                if genre:
+                    genres[genre] = genres.get(genre, 0) + 1
 
-    for i, (genre, count) in enumerate(sorted_genres):
-        songs_with_art = user_songs.filter(
-            album_art__isnull=False
-        ).exclude(album_art__exact='').order_by('-popularity')
+        # Sort genres by count (most listened first)
+        sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
+        genre_list = []
 
-        seen_artists = set()
-        seen_album_arts = set()
-        unique_images = []
-        unique_artists = []
+        for i, (genre, count) in enumerate(sorted_genres):
+            songs_with_art = user_songs.filter(
+                album_art__isnull=False
+            ).exclude(album_art__exact='').order_by('-popularity')
 
-        def process_song(song, exact=True):
-            song_genres = [g.strip() for g in song.genres.split(',') if g.strip()]
-            if not song_genres:
-                return False
+            seen_artists = set()
+            seen_album_arts = set()
+            unique_images = []
+            unique_artists = []
 
-            first_genre = song_genres[0].lower()
-            if exact and first_genre != genre.lower():
-                return False
-            if not exact and genre.lower() not in [g.lower() for g in song_genres]:
-                return False
+            def process_song(song, exact=True):
+                song_genres = [g.strip() for g in song.genres.split(',') if g.strip()]
+                if not song_genres:
+                    return False
 
-            if not song.artist_names:
-                return False
-            if song.artist_names.startswith("Tyler, The Creator"):
-                artist = "Tyler, The Creator"
-            else:
-                artist = song.artist_names.split(',')[0].strip()
+                first_genre = song_genres[0].lower()
+                if exact and first_genre != genre.lower():
+                    return False
+                if not exact and genre.lower() not in [g.lower() for g in song_genres]:
+                    return False
 
-            album_art = song.album_art.strip()
-            if not album_art or album_art in seen_album_arts or artist in seen_artists:
-                return False
+                if not song.artist_names:
+                    return False
+                if song.artist_names.startswith("Tyler, The Creator"):
+                    artist = "Tyler, The Creator"
+                else:
+                    artist = song.artist_names.split(',')[0].strip()
 
-            unique_images.append(album_art)
-            unique_artists.append(artist)
-            seen_artists.add(artist)
-            seen_album_arts.add(album_art)
-            return True
+                album_art = song.album_art.strip()
+                if not album_art or album_art in seen_album_arts or artist in seen_artists:
+                    return False
 
-        # First pass
-        for song in songs_with_art:
-            if len(unique_images) >= 4:
-                break
-            process_song(song, exact=True)
+                unique_images.append(album_art)
+                unique_artists.append(artist)
+                seen_artists.add(artist)
+                seen_album_arts.add(album_art)
+                return True
 
-        # Second pass
-        if len(unique_images) < 4:
+            # First pass
             for song in songs_with_art:
                 if len(unique_images) >= 4:
                     break
-                process_song(song, exact=False)
+                process_song(song, exact=True)
 
-        # Fallback to Spotify if needed
-        if len(unique_images) < 4:
-            try:
-                results = sp.search(q=f'genre:"{genre}"', type='track', limit=20)
-                for item in results['tracks']['items']:
-                    track_id = item['id']
-                    track_name = item['name']
-                    popularity = item['popularity']
-                    album_art = item['album']['images'][0]['url'] if item['album']['images'] else None
-                    genres_list = [genre]  # You can’t get genre from track in Spotify API directly
-
-                    artist_names_list = [artist['name'] for artist in item['artists']]
-                    if artist_names_list[0] == "Tyler, The Creator":
-                        display_artist = "Tyler, The Creator"
-                    else:
-                        display_artist = artist_names_list[0].split(',')[0].strip()
-
-                    if album_art and album_art not in seen_album_arts and display_artist not in seen_artists:
-                        unique_images.append(album_art)
-                        unique_artists.append(display_artist)
-                        seen_artists.add(display_artist)
-                        seen_album_arts.add(album_art)
-
-                        # Check if song exists
-                        if not Song.objects.filter(track_id=track_id).exists():
-                            Song.objects.create(
-                                track_id=track_id,
-                                track_name=track_name,
-                                artist_names=", ".join(artist_names_list),
-                                album_art=album_art,
-                                genres=", ".join(genres_list),
-                                popularity=popularity
-                                # users left blank
-                            )
-
+            # Second pass
+            if len(unique_images) < 4:
+                for song in songs_with_art:
                     if len(unique_images) >= 4:
                         break
-            except Exception as e:
-                print(f"Spotify fallback failed for genre {genre}: {e}")
+                    process_song(song, exact=False)
 
-        while len(unique_images) < 4:
-            unique_images.append("https://via.placeholder.com/150?text=No+Image")
-            unique_artists.append("Unknown Artist")
+            # Fallback to Spotify if needed
+            if len(unique_images) < 4:
+                try:
+                    results = sp.search(q=f'genre:"{genre}"', type='track', limit=20)
+                    for item in results['tracks']['items']:
+                        track_id = item['id']
+                        track_name = item['name']
+                        popularity = item['popularity']
+                        album_art = item['album']['images'][0]['url'] if item['album']['images'] else None
+                        genres_list = [genre]  # You can’t get genre from track in Spotify API directly
 
-        genre_list.append((i + 1, genre, count, unique_images, unique_artists))
+                        artist_names_list = [artist['name'] for artist in item['artists']]
+                        if artist_names_list[0] == "Tyler, The Creator":
+                            display_artist = "Tyler, The Creator"
+                        else:
+                            display_artist = artist_names_list[0].split(',')[0].strip()
+
+                        if album_art and album_art not in seen_album_arts and display_artist not in seen_artists:
+                            unique_images.append(album_art)
+                            unique_artists.append(display_artist)
+                            seen_artists.add(display_artist)
+                            seen_album_arts.add(album_art)
+
+                            # Check if song exists
+                            if not Song.objects.filter(track_id=track_id).exists():
+                                Song.objects.create(
+                                    track_id=track_id,
+                                    track_name=track_name,
+                                    artist_names=", ".join(artist_names_list),
+                                    album_art=album_art,
+                                    genres=", ".join(genres_list),
+                                    popularity=popularity
+                                    # users left blank
+                                )
+
+                        if len(unique_images) >= 4:
+                            break
+                except Exception as e:
+                    print(f"Spotify fallback failed for genre {genre}: {e}")
+
+            while len(unique_images) < 4:
+                unique_images.append("https://via.placeholder.com/150?text=No+Image")
+                unique_artists.append("Unknown Artist")
+
+            genre_list.append((i + 1, genre, count, unique_images, unique_artists))
+    else:
+        genre_list = cached_genre_list
+
 
     # Paginate results (50 genres per page)
     paginator = Paginator(genre_list, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    cache.set(cache_key, genre_list, timeout=60 * 15)  # cache for 15 minutes
 
     return render(request, 'spotifyapp/view_top_genres.html', {'genres': page_obj})
 
