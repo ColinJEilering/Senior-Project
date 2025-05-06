@@ -19,6 +19,8 @@ import time
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 import time
+from django.core.cache import cache
+
 
 
 
@@ -51,7 +53,7 @@ def spotify_callback(request):
     sp_oauth = spotipy.Spotify(auth_manager = SpotifyOAuth(
         client_id= env('SPOTIPY_CLIENT_ID'),
         client_secret=env('SPOTIPY_CLIENT_SECRET'),
-        redirect_uri=settings.SPOTIPY_REDIRECT_URI,
+        redirect_uri=env('SPOTIPY_REDIRECT_URI'),
         scope='playlist-modify-private playlist-modify-public user-library-read user-top-read user-read-recently-played'
     ))
 
@@ -129,6 +131,7 @@ def test_spotify_connection(request):
         logger.error(f"Error connecting to Spotify API: {e}")
         return HttpResponse(f"Error connecting to Spotify API: {e}", status=500)
 
+@csrf_exempt
 def login_view(request):
     if request.method == "POST":
         username = request.POST["username"]
@@ -238,31 +241,130 @@ def view_top_artists(request, time_range='short_term'):
 @login_required
 def view_top_genres(request):
     user = request.user
-    user_songs = Song.objects.filter(users=user)
+    cache_key = f"user_top_genres_{user.id}"
+    page_number = request.GET.get('page', 1)
 
-    # Build a dictionary of genre counts
-    genres = {}
-    for song in user_songs:
-        for genre in song.genres.split(', '):
-            genre = genre.strip()
-            if genre:
-                genres[genre] = genres.get(genre, 0) + 1
+    cached_genre_list = cache.get(cache_key)
+    if not cached_genre_list:
+        user_songs = Song.objects.filter(users=user)
 
-    # Sort genres by count (most listened first)
-    sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
+        # Build a dictionary of genre counts
+        genres = {}
+        for song in user_songs:
+            for genre in song.genres.split(', '):
+                genre = genre.strip()
+                if genre:
+                    genres[genre] = genres.get(genre, 0) + 1
 
-    genre_list = []
-    for i, (genre, count) in enumerate(sorted_genres):
-        # For each genre, fetch up to 4 distinct album art images as a stand-in for artist images.
-        # We're filtering songs that have the genre in their genres field.
-        songs_in_genre = user_songs.filter(genres__icontains=genre).exclude(album_art__isnull=True).exclude(album_art__exact='')
-        images = list(songs_in_genre.values_list('album_art', flat=True).distinct()[:4])
-        genre_list.append((i + 1, genre, count, images))
+        # Sort genres by count (most listened first)
+        sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
+        genre_list = []
+
+        for i, (genre, count) in enumerate(sorted_genres):
+            songs_with_art = user_songs.filter(
+                album_art__isnull=False
+            ).exclude(album_art__exact='').order_by('-popularity')
+
+            seen_artists = set()
+            seen_album_arts = set()
+            unique_images = []
+            unique_artists = []
+
+            def process_song(song, exact=True):
+                song_genres = [g.strip() for g in song.genres.split(',') if g.strip()]
+                if not song_genres:
+                    return False
+
+                first_genre = song_genres[0].lower()
+                if exact and first_genre != genre.lower():
+                    return False
+                if not exact and genre.lower() not in [g.lower() for g in song_genres]:
+                    return False
+
+                if not song.artist_names:
+                    return False
+                if song.artist_names.startswith("Tyler, The Creator"):
+                    artist = "Tyler, The Creator"
+                else:
+                    artist = song.artist_names.split(',')[0].strip()
+
+                album_art = song.album_art.strip()
+                if not album_art or album_art in seen_album_arts or artist in seen_artists:
+                    return False
+
+                unique_images.append(album_art)
+                unique_artists.append(artist)
+                seen_artists.add(artist)
+                seen_album_arts.add(album_art)
+                return True
+
+            # First pass
+            for song in songs_with_art:
+                if len(unique_images) >= 4:
+                    break
+                process_song(song, exact=True)
+
+            # Second pass
+            if len(unique_images) < 4:
+                for song in songs_with_art:
+                    if len(unique_images) >= 4:
+                        break
+                    process_song(song, exact=False)
+
+            # Fallback to Spotify if needed
+            if len(unique_images) < 4:
+                try:
+                    results = sp.search(q=f'genre:"{genre}"', type='track', limit=20)
+                    for item in results['tracks']['items']:
+                        track_id = item['id']
+                        track_name = item['name']
+                        popularity = item['popularity']
+                        album_art = item['album']['images'][0]['url'] if item['album']['images'] else None
+                        genres_list = [genre]  # You can’t get genre from track in Spotify API directly
+
+                        artist_names_list = [artist['name'] for artist in item['artists']]
+                        if artist_names_list[0] == "Tyler, The Creator":
+                            display_artist = "Tyler, The Creator"
+                        else:
+                            display_artist = artist_names_list[0].split(',')[0].strip()
+
+                        if album_art and album_art not in seen_album_arts and display_artist not in seen_artists:
+                            unique_images.append(album_art)
+                            unique_artists.append(display_artist)
+                            seen_artists.add(display_artist)
+                            seen_album_arts.add(album_art)
+
+                            # Check if song exists
+                            if not Song.objects.filter(track_id=track_id).exists():
+                                Song.objects.create(
+                                    track_id=track_id,
+                                    track_name=track_name,
+                                    artist_names=", ".join(artist_names_list),
+                                    album_art=album_art,
+                                    genres=", ".join(genres_list),
+                                    popularity=popularity
+                                    # users left blank
+                                )
+
+                        if len(unique_images) >= 4:
+                            break
+                except Exception as e:
+                    print(f"Spotify fallback failed for genre {genre}: {e}")
+
+            while len(unique_images) < 4:
+                unique_images.append("https://via.placeholder.com/150?text=No+Image")
+                unique_artists.append("Unknown Artist")
+
+            genre_list.append((i + 1, genre, count, unique_images, unique_artists))
+    else:
+        genre_list = cached_genre_list
+
 
     # Paginate results (50 genres per page)
     paginator = Paginator(genre_list, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    cache.set(cache_key, genre_list, timeout=60 * 15)  # cache for 15 minutes
 
     return render(request, 'spotifyapp/view_top_genres.html', {'genres': page_obj})
 
@@ -508,24 +610,18 @@ def combine_candidates(candidates):
 def get_recommendations(request):
     if request.method == "POST":
         try:
-            # Retrieve the weights from the form
             weight_genres   = int(request.POST.get("weight_genres", 25))
             weight_artists  = int(request.POST.get("weight_artists", 25))
-            num_songs       = int(request.POST.get("num_songs",20))
+            num_songs       = int(request.POST.get("num_songs", 20))
             playlist_name   = request.POST.get("playlist_name", "Recommended Playlist")
-                        
-            # Optional fields
-            year_filter = request.POST.get("year_filter", "").strip()  # e.g. "1990" or "1990-2000"
+
+            year_filter = request.POST.get("year_filter", "").strip()
             hipster_mode = request.POST.get("hipster_mode", "off") == "on"
-            
-            # Prepare a field filter string (for Spotify search queries)
             year_query = f' year:{year_filter}' if year_filter else ''
-            
-            # Dictionary to accumulate candidate track scores
+
             candidate_scores = {}
 
-            # 2. Top Genres
-            # Use your stored songs to get user’s top genres (similar to view_top_genres)
+            # 1. User's Songs and Top Genres
             user_songs = Song.objects.filter(users=request.user)
             genres = {}
             for song in user_songs:
@@ -534,71 +630,64 @@ def get_recommendations(request):
                     if g:
                         genres[g] = genres.get(g, 0) + 1
             sorted_genres = sorted(genres.items(), key=lambda item: item[1], reverse=True)
-            top_genres = [genre for genre, count in sorted_genres[:20]]  # top 20 genres
+            top_genres = [genre for genre, count in sorted_genres[:30]]
 
             for genre in top_genres:
-                # Build a search query for the genre
                 query = f'genre:"{genre}"{year_query}'
                 if hipster_mode:
-                    # In hipster mode, search for albums with tag:hipster
                     query = f'tag:hipster album:"{genre}"{year_query}'
-                    # Search albums then pull tracks from album
-                    albums = sp.search(q=query, type='album', limit=5).get('albums', {}).get('items', [])
+                    albums = sp.search(q=query, type='album', limit=20).get('albums', {}).get('items', [])
                     for album in albums:
-                        album_id = album.get('id')
-                        album_tracks = sp.album_tracks(album_id).get('items', [])
-                        for track in album_tracks:
+                        tracks = sp.album_tracks(album.get('id')).get('items', [])
+                        for track in tracks:
                             track_id = track.get('id')
                             candidate_scores[track_id] = candidate_scores.get(track_id, 0) + weight_genres
                 else:
-                    # Normal search: search for tracks based on genre
-                    results = sp.search(q=query, type='track', limit=5)
+                    results = sp.search(q=query, type='track', limit=20)
                     for track in results.get('tracks', {}).get('items', []):
                         track_id = track.get('id')
                         candidate_scores[track_id] = candidate_scores.get(track_id, 0) + weight_genres
 
-            # 3. Top Artists
-            # Use top artists to search tracks normally (with year filter if provided)
-            top_artists = sp.current_user_top_artists(limit=20, time_range='medium_term').get('items', [])
+            # 2. Top Artists
+            top_artists = sp.current_user_top_artists(limit=30, time_range='medium_term').get('items', [])
             for artist in top_artists:
                 artist_name = artist.get('name')
-                # Build a search query: artist and optionally year
                 query = f'artist:"{artist_name}"{year_query}'
-                # In hipster mode, search for albums with tag:hipster
                 if hipster_mode:
                     query = f'tag:hipster album:"{artist_name}"{year_query}'
-                    albums = sp.search(q=query, type='album', limit=5).get('albums', {}).get('items', [])
+                    albums = sp.search(q=query, type='album', limit=10).get('albums', {}).get('items', [])
                     for album in albums:
-                        album_tracks = sp.album_tracks(album.get('id')).get('items', [])
-                        for track in album_tracks:
+                        tracks = sp.album_tracks(album.get('id')).get('items', [])
+                        for track in tracks:
                             track_id = track.get('id')
                             candidate_scores[track_id] = candidate_scores.get(track_id, 0) + weight_artists
                 else:
-                    results = sp.search(q=query, type='track', limit=5)
+                    results = sp.search(q=query, type='track', limit=10)
                     for track in results.get('tracks', {}).get('items', []):
                         track_id = track.get('id')
                         candidate_scores[track_id] = candidate_scores.get(track_id, 0) + weight_artists
 
-            # Combine candidates sorted by their weighted scores
+            # Combine and sort candidates
             recommended_track_ids = combine_candidates(candidate_scores)
 
-            # Fetch detailed info for top recommendations and store/update in DB
-            recommended_tracks = []
-            for i, track_id in enumerate(recommended_track_ids):
-                # Only consider this track if it isn't already in the user's library.
-                print(Song.objects.filter(track_id=track_id, users=request.user).query)
-                print(Song.objects.filter(track_id=track_id, users=request.user).exists())
-                if Song.objects.filter(track_id=track_id, users=request.user).exists():
-                    recommended_track_ids.remove(track_id)
-                    continue
+            # Filter out tracks already in the user's library
+            overfetch = num_songs * 10  # Overfetch to ensure we get enough unique tracks to add to a playlist
+            filtered_track_ids = []
+            for track_id in recommended_track_ids[:overfetch]:
+                if not Song.objects.filter(track_id=track_id, users=request.user).exists():
+                    filtered_track_ids.append(track_id)
+                if len(filtered_track_ids) >= num_songs:
+                    break
 
+            recommended_tracks = []
+
+            for idx, track_id in enumerate(filtered_track_ids):
                 try:
                     track = sp.track(track_id)
-                    # Save (or update) the track in the database and associate with the user.
                     song_obj = get_or_create_song(track, request.user)
                     if song_obj:
                         recommended_tracks.append({
-                            'index': len(recommended_tracks) + 1,
+                            'index': idx + 1,
                             'track_name': song_obj.track_name,
                             'artist_names': song_obj.artist_names,
                             'album_art': song_obj.album_art,
@@ -608,20 +697,22 @@ def get_recommendations(request):
                     logger.error(f"Error fetching details for track {track_id}: {e}")
                     continue
 
-                # Stop once we have 20 recommendations.
                 if len(recommended_tracks) >= num_songs:
                     break
-                new_playlist_id = create_playlist(playlist_name)
-                logger.debug("Debug message: 8")
-                if new_playlist_id:
-                    # Add up to num_songs tracks instead of 50
-                    add_tracks_to_playlist(new_playlist_id, recommended_track_ids[:num_songs])
-                    return render(request, 'spotifyapp/recommendations_result.html', {
-                        'tracks': recommended_tracks,
-                    })
-                else:
-                    return HttpResponse("Failed to create playlist.")
 
+            # Create the playlist and add songs only if we have some
+            if filtered_track_ids:
+                new_playlist_id = create_playlist(playlist_name)
+                if new_playlist_id:
+                    logger.debug(f"Adding {len(filtered_track_ids[:num_songs])} tracks to playlist {new_playlist_id}")
+                    add_tracks_to_playlist(new_playlist_id, filtered_track_ids[:num_songs])
+                else:
+                    logger.warning("Playlist creation failed.")
+                    return HttpResponse("Failed to create playlist.")
+            else:
+                logger.warning("No valid recommended tracks to add to playlist.")
+
+            # Render results
             return render(request, 'spotifyapp/recommendations_result.html', {
                 'tracks': recommended_tracks,
             })
@@ -629,24 +720,5 @@ def get_recommendations(request):
         except Exception as e:
             logger.error(f"Error in recommendation algorithm: {e}")
             return render(request, 'spotifyapp/recommendations_result.html', {'tracks': []})
-    else:
-        return render(request, 'spotifyapp/recommendations.html')
-    
-@login_required
-@csrf_exempt  
-def like_track(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            track_id = data.get("track_id")
-            if not track_id:
-                return JsonResponse({"error": "No track_id provided."}, status=400)
 
-            # Use the Spotipy client (ensure you have a valid access token from session or elsewhere)
-            result = sp.current_user_saved_tracks_add([track_id])
-            # Optionally, update your database as well. For example, you might want to record that the user "liked" it.
-            return JsonResponse({"success": True})
-        except Exception as e:
-            logger.error(f"Error liking track: {e}")
-            return JsonResponse({"error": str(e)}, status=500)
-    return JsonResponse({"error": "Invalid request method."}, status=405)
+    return render(request, 'spotifyapp/recommendations.html')

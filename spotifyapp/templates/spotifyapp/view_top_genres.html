@@ -69,6 +69,33 @@
             height: auto;
             object-fit: cover;
         }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 150px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -75px; /* Use half of the width (150 / 2), to center the tooltip */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -82,23 +109,30 @@
                     <a href="{% url 'index' %}">Main Menu</a>
                 </div>
             </nav>
-
             <div class="artist-grid">
                 {% for genre in genres %}
-                {# Each genre tuple: (rank, genre_name, count, images) #}
+                {# Each genre tuple: (rank, genre_name, count, images, artist_names) #}
                 <div class="artist-item" data-genre="{{ genre.1 }}">
-                    <div class="artist-info">
-                        {{ genre.0 }}. {{ genre.1 }} ({{ genre.2 }})
+                    <div class="tooltip">
+                        <div class="artist-info">
+                            {{ genre.0 }}. {{ genre.1 }} ({{ genre.2 }})
+                        </div>
+                        <span class="tooltiptext">
+                            <strong>Artists:</strong><br>
+                            {% for artist in genre.4 %}
+                                {{ artist }}<br>
+                            {% endfor %}
+                        </span>
+                        {% if genre.3 %}
+                        <div class="collage">
+                            {% for image in genre.3 %}
+                                <img src="{{ image }}" alt="Album Art" />
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p>No images available</p>
+                        {% endif %}
                     </div>
-                    {% if genre.3 %}
-                    <div class="collage">
-                        {% for img in genre.3 %}
-                        <img src="{{ img }}" alt="Artist Image">
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <p>No images available</p>
-                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
