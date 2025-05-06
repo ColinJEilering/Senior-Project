@@ -363,7 +363,7 @@ def view_top_genres(request):
     paginator = Paginator(genre_list, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    cache.set(cache_key, genre_list, timeout=60 * 15)  # cache for 15 minutes
+    cache.set(cache_key, genre_list, timeout=60 * 60)  # cache for 15 minutes
 
     return render(request, 'spotifyapp/view_top_genres.html', {'genres': page_obj})
 
