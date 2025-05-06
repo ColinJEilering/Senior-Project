@@ -1,3 +1,4 @@
+from django.contrib.auth.forms import UserCreationForm
 import random
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError

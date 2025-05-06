@@ -1,7 +1,14 @@
 # Senior-Project
 Repo for Senior Project Course
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+commit testing
+=======
+I sent a secret.env file to you on discord. Put it in the same directory as the manage.py file.
+=======
 In order to run this you will need to do the following:
+>>>>>>> 3605a7a9d0e5625312d453d9b3aa6c4db220e431
 
     - Go to https://developer.spotify.com/dashboard and create an account
         - click create new app
@@ -32,3 +39,8 @@ In order to run this you will need to do the following:
 
     - In your browser go to: http://127.0.0.1:8000/ 
 
+<<<<<<< HEAD
+Then go to your localhost or http://127.0.0.1:8000/ in your browser
+>>>>>>> 6aa791be70844e2a1724f20d712b5e66a07eefc3
+=======
+>>>>>>> 3605a7a9d0e5625312d453d9b3aa6c4db220e431
